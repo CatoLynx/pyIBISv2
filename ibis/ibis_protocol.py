@@ -145,8 +145,8 @@ class IBISMaster:
         if reply_length:
             reply = self.device.read(reply_length + 2)
             self.debug_telegram(reply, receive = True)
-            telegram = telegram[:-2]
-            return reply
+            reply = reply[:-2]
+            return reply.decode('latin1')
     
     def vdv_hex(self, value):
         """
@@ -297,7 +297,7 @@ class IBISMaster:
     def parse_DS1201(self, telegram):
         if not telegram:
             return None
-        version = int(telegram[2:])
+        version = telegram[2:]
         reply = {
             'version': version
         }
@@ -420,10 +420,10 @@ class IBISMaster:
     
     def DS068(self, channel, radio_telegram_type, delay, reporting_point_id, hand, line_number, course_number, destination_id, train_length):
         """
-        Send a LSA radio telegram
+        Send an LSA radio telegram
         """
         
-        radio_telegram = "{}{}{:02d}{}{}{:04d}{}{:03d}{:02d}{:03d}{}".format(
+        radio_telegram = "{}{}{:02d}{}{}{:0>4}{}{:03d}{:02d}{:03d}{}".format(
             self.vdv_hex(channel),
             self.vdv_hex(0),
             radio_telegram_type,

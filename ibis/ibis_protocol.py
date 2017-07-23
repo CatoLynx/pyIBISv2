@@ -131,6 +131,8 @@ class IBISMaster:
         
         Returns:
         The received telegram OR None
+        
+        TODO: Actually check the checksum
         """
         
         if type(telegram) is str:
@@ -153,7 +155,7 @@ class IBISMaster:
         Convert a numerical value into the VDV hexadecimal representation
         
         value:
-        The value to convert (0 to 15) OR a VDV Hex value to convert back
+        The value to convert (0 to 255) OR a VDV Hex value to convert back
         
         Returns:
         The VDV Hex value OR the integer for the VDV Hex value
@@ -161,9 +163,21 @@ class IBISMaster:
         
         vdvhex = "0123456789:;<=>?"
         if type(value) is int:
-            return vdvhex[value]
+            assert 0 <= value <= 255
+            if value > 15:
+                high_nibble = value >> 4
+                low_nibble = value % 16
+                return vdvhex[high_nibble] + vdvhex[low_nibble]
+            else:
+                return vdvhex[value]
         else:
-            return vdvhex.index(value)
+            assert 1 <= len(value) <= 2
+            if len(value) == 2:
+                high_nibble = vdvhex.index(value[0])
+                low_nibble = vdvhex.index(value[1])
+                return high_nibble << 4 + low_nibble
+            else:
+                return vdvhex.index(value)
     
     def _tg(self, fmt, reply_length = 0):
         """
@@ -439,3 +453,40 @@ class IBISMaster:
         return self.parse_DS160(self.send_telegram("oFM{}{}"
             .format(self.vdv_hex(math.ceil(len(radio_telegram) / 2)),
                 radio_telegram), reply_length = 3))
+    
+    def GSP(self, address, line1 = "", line2 = ""):
+        """
+        Send GSP display data
+        Reply: DS120
+        
+        address:
+        The address of the display
+        
+        line1:
+        The top line text
+        
+        line2:
+        The bottom line text
+        """
+        
+        lines = ""
+        if line2:
+            line1 += "\x0a" # Line feed (LF)
+        lines += line1
+        lines += line2
+        lines += "\x0a\x0a"
+        
+        num_blocks = math.ceil(len(lines) / 16)
+        remainder = len(lines) % 16
+        if remainder:
+            filler = " " * (16 - remainder)
+        else:
+            filler = ""
+        
+        data = "aA{address}{num_blocks}{lines}{filler}".format(
+            address = self.vdv_hex(address),
+            num_blocks = self.vdv_hex(num_blocks),
+            lines = lines,
+            filler = filler)
+        
+        return self.parse_DS120(self.send_telegram(data, reply_length = 2))

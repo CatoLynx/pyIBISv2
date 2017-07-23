@@ -1,5 +1,5 @@
 name = "pyIBIS"
-version = "2.0.1"
+version = "2.1.0"
 description = "A library for sending and receiving IBIS (VDV 300) telegrams"
 license = "GPLv3"
 author = "Julian Metzler"

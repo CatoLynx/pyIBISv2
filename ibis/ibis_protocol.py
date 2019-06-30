@@ -1,34 +1,17 @@
-"""
-Main protocol library
-"""
-
 import math
-import serial
 
-class IBISMaster:
+class IBISProtocol:
     """
-    An IBIS bus master, sending and receiving telegrams.
+    All the logic related to the IBIS protocol
     """
     
-    def __init__(self, port, debug = False):
+    def __init__(self, debug = False):
         """
-        port:
-        The serial port to use for communication
-        
         debug:
         Whether to print the sent and received telegrams
         """
         
-        self.port = port
         self.debug = debug
-        self.device = serial.Serial(
-            self.port,
-            baudrate = 1200,
-            bytesize = serial.SEVENBITS,
-            parity = serial.PARITY_EVEN,
-            stopbits = serial.STOPBITS_TWO,
-            timeout = 2.0
-        )
         
         # Simple telegram definitions
         self.DS001 = self._tg("l{:03d}")        # Line number, 1-4 digits
@@ -61,6 +44,20 @@ class IBISMaster:
         self.DS010b = self._tg("xI{:02d}")      # Line progress display stop ID, 1-2 digits
         self.DS010d = self._tg("xJ{:04d}")      # Year, YYYY
         self.DS010e = self._tg("xV{}{:03d}")    # Delay, +/-, 1-3 digits
+    
+    def _send(self, telegram):
+        """
+        Actually send the telegram.
+        This varies depending on implementation and needs to be overridden
+        """
+        pass
+    
+    def _receive(self, length):
+        """
+        Actually receive data.
+        This varies depending on implementation and needs to be overridden
+        """
+        pass
     
     def debug_telegram(self, telegram, receive = False):
         """
@@ -143,9 +140,9 @@ class IBISMaster:
         
         telegram = self.wrap_telegram(telegram)
         self.debug_telegram(telegram)
-        self.device.write(telegram)
+        self._send(telegram)
         if reply_length:
-            reply = self.device.read(reply_length + 2)
+            reply = self._receive(reply_length + 2)
             self.debug_telegram(reply, receive = True)
             reply = reply[:-2]
             return reply.decode('latin1')

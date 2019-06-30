@@ -18,3 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from .metadata import version as __version__
 from .ibis_protocol import *
+from .ibis_serial import SerialIBISMaster
+from .ibis_tcp import TCPIBISMaster
+
+IBISMaster = SerialIBISMaster

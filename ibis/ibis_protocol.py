@@ -63,7 +63,6 @@ class IBISProtocol:
         """
         Replace non-printable chars with printable variants.
         """
-        print(type(telegram))
         printable_telegram = ""
         for char in telegram:
             if char in range(0, 32):

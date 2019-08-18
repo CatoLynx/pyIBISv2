@@ -58,6 +58,19 @@ class IBISProtocol:
         This varies depending on implementation and needs to be overridden
         """
         pass
+
+    def _printable(self, telegram):
+        """
+        Replace non-printable chars with printable variants.
+        """
+        print(type(telegram))
+        printable_telegram = ""
+        for char in telegram:
+            if char in range(0, 32):
+                printable_telegram += "<{:02X}>".format(char).ljust(5)
+            else:
+                printable_telegram += chr(char).ljust(5)
+        return printable_telegram
     
     def debug_telegram(self, telegram, receive = False):
         """
@@ -72,8 +85,8 @@ class IBISProtocol:
         
         if self.debug:
             action = "Received" if receive else "Sending"
-            telegram_hex = " ".join("{:02X}".format(byte) for byte in telegram)
-            telegram_ascii = "  ".join(chr(byte) for byte in telegram[:-2])
+            telegram_hex = "".join("{:02X}".format(byte).ljust(5) for byte in telegram)
+            telegram_ascii = self._printable(telegram[:-2])
             print("{} telegram:\n{}\n{}\n"
                 .format(action, telegram_ascii, telegram_hex))
     

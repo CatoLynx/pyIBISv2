@@ -217,6 +217,60 @@ class IBISProtocol:
         return self.send_telegram("zA{}{}"
             .format(self.vdv_hex(num_blocks), text.ljust(num_blocks*16)))
     
+    def DS003aUESTRA(self, front_text, side_text = "", line_text = "", display_line_text = True):
+        """
+        Destination text for ÜSTRA displays
+        Probably incomplete; pending further documentation
+        
+        front_text:
+        The destination text for the front display
+
+        side_text:
+        The destination text for the side display
+
+        line_text:
+        The line number (alphanumerical)
+
+        display_line_text:
+        If True, display line number on large displays
+        """
+
+        def _insert_case_switch_control_chars(text):
+            """
+            Insert the case-switching control character 0x06 in the given text
+            to switch between upper and lower case
+            """
+            if not text:
+                return ""
+            ret_text = ""
+            if not (text[0].isupper() or text[0].isdigit()):
+                ret_text += "\x06"
+            for i in range(len(text)):
+                ret_text += text[i].upper()
+                if i < len(text)-1 and (text[i].isupper() or text[i].isdigit()) != (text[i+1].isupper() or text[i+1].isdigit()):
+                    ret_text += "\x06"
+            return ret_text
+
+        front_text_lines = front_text.splitlines()
+        side_text_lines = side_text.splitlines()
+
+        while len(front_text_lines) < 2:
+            front_text_lines.append("")
+
+        while len(side_text_lines) < 2:
+            side_text_lines.append("")
+
+        data = "\n.W{ftext1}\n{ftext2}\n.X{stext1}\n{stext2}\n.Y{ltext}\n\n.C{dlflag}100MMM".format(
+            ftext1=_insert_case_switch_control_chars(front_text_lines[0]),
+            ftext2=_insert_case_switch_control_chars(front_text_lines[1]),
+            stext1=_insert_case_switch_control_chars(side_text_lines[0]),
+            stext2=_insert_case_switch_control_chars(side_text_lines[1]),
+            ltext=_insert_case_switch_control_chars(line_text),
+            dlflag="1" if display_line_text and line_text else "0")
+        num_blocks = math.ceil(len(data) / 4)
+        return self.send_telegram("zA{:>02}{}"
+            .format(self.vdv_hex(num_blocks), data.ljust(num_blocks*4)))
+    
     def DS003c(self, text):
         """
         Next stop text

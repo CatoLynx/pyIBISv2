@@ -368,6 +368,25 @@ class IBISProtocol:
                 self.vdv_hex(num_blocks),
                 self.vdv_hex(remainder),
                 data))
+
+    def DS021t(self, address, text):
+        """
+        Destination text
+
+        address:
+        The address of the display
+
+        text:
+        The destination text
+        """
+
+        num_blocks = math.ceil(len(text) / 16)
+        if '\n' not in text:
+            text = text + '\n'
+        return self.send_telegram("aA{}{}A0{}\n\n  "
+            .format(self.vdv_hex(address),
+                self.vdv_hex(num_blocks),
+                text))
     
     def DS060(self, direction):
         """

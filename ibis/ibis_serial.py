@@ -41,3 +41,6 @@ class SerialIBISMaster(IBISProtocol):
         """
         
         return self.device.read(length)
+
+    def __del__(self):
+        self.device.close()

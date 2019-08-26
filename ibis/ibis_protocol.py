@@ -59,17 +59,14 @@ class IBISProtocol:
         """
         pass
 
-    def _printable(self, telegram):
+    def _printable(self, char):
         """
         Replace non-printable chars with printable variants.
         """
-        printable_telegram = ""
-        for char in telegram:
-            if char in range(0, 32):
-                printable_telegram += "<{:02X}>".format(char).ljust(5)
-            else:
-                printable_telegram += chr(char).ljust(5)
-        return printable_telegram
+        if char in range(0, 32):
+            return "<{:02X}>".format(char)
+        else:
+            return chr(char)
     
     def debug_telegram(self, telegram, receive = False):
         """
@@ -84,10 +81,10 @@ class IBISProtocol:
         
         if self.debug:
             action = "Received" if receive else "Sending"
-            telegram_hex = "".join("{:02X}".format(byte).ljust(5) for byte in telegram)
-            telegram_ascii = self._printable(telegram[:-2])
-            print("{} telegram:\n{}\n{}\n"
-                .format(action, telegram_ascii, telegram_hex))
+            telegram_debug = "\n".join("{:02X} {}".format(
+                byte, self._printable(byte)) for byte in telegram)
+            print("{} telegram:\n".format(action))
+            print(telegram_debug)
     
     def process_special_characters(self, telegram):
         """
@@ -217,22 +214,58 @@ class IBISProtocol:
         return self.send_telegram("zA{}{}"
             .format(self.vdv_hex(num_blocks), text.ljust(num_blocks*16)))
     
-    def DS003aUESTRA(self, front_text, side_text = "", line_text = "", display_line_text = True):
+    def DS003aUESTRA(self, front_text, side_text = "", line_text = "",
+        display_line_text_front = True, display_line_text_side = True,
+        display_interval_front = 3.0, display_interval_side = 3.0,
+        text_align_front = "M", text_align_side = "M",
+        bold_text_front = True, bold_text_side = True):
         """
         Destination text for ÜSTRA displays
-        Probably incomplete; pending further documentation
         
         front_text:
         The destination text for the front display
+        (string or array of up to 4 strings to be displayed sequentially)
 
         side_text:
         The destination text for the side display
+        (string or array of up to 4 strings to be displayed sequentially)
 
         line_text:
-        The line number (alphanumerical)
+        The line number (string, alphanumerical)
 
-        display_line_text:
-        If True, display line number on large displays
+        display_line_text_front:
+        Whether to display line number on the front display
+        (bool or array of up to 4 bools to set line number display
+        per text block)
+
+        display_line_text_side:
+        Whether to display line number on the side display
+        (bool or array of up to 4 bools to set line number display
+        per text block)
+        
+        display_interval_front:
+        Interval for switching between sequential text blocks in seconds
+        on the front display (1.0 ... 8.5 seconds, in 0.5 second steps)
+        
+        display_interval_side:
+        Interval for switching between sequential text blocks in seconds
+        on the side display (1.0 ... 8.5 seconds, in 0.5 second steps)
+        
+        text_align_front:
+        Text align for front text. (L=Left, M=Middle, R=Right)
+        
+        text_align_side:
+        Text align for side text. (L=Left, M=Middle, R=Right)
+        
+        bold_text_front:
+        Whether text should be bold or thin on the front display.
+        (bool or array of bools for block 1 line 1, block 1 line 2,
+        block 2 line 1, block 2 line 2, etc. up to block 4 line 2)
+        
+        bold_text_side:
+        Whether text should be bold or thin on the side display.
+        (bool or array of bools for block 1 line 1, block 1 line 2,
+        block 2 line 1, block 2 line 2, etc. up to block 4 line 2)
         """
 
         def _insert_case_switch_control_chars(text):
@@ -243,30 +276,74 @@ class IBISProtocol:
             if not text:
                 return ""
             ret_text = ""
-            if not (text[0].isupper() or text[0].isdigit()):
-                ret_text += "\x06"
-            for i in range(len(text)):
-                ret_text += text[i].upper()
-                if i < len(text)-1 and (text[i].isupper() or text[i].isdigit()) != (text[i+1].isupper() or text[i+1].isdigit()):
-                    ret_text += "\x06"
+            is_lower = False # Keep track of the current case
+            for char in text:
+                if not is_lower and ord(char) in range(0x60, 0x80):
+                    ret_text += chr(0x06)
+                    is_lower = True
+                if is_lower and ord(char) in range(0x40, 0x60):
+                    ret_text += chr(0x06)
+                    is_lower = False
+                if char == "\n":
+                    is_lower = False
+                ret_text += char.upper()
+            if is_lower:
+                # Make sure we are back to upper
+                ret_text += chr(0x06)
             return ret_text
-
-        front_text_lines = front_text.splitlines()
-        side_text_lines = side_text.splitlines()
-
-        while len(front_text_lines) < 2:
-            front_text_lines.append("")
-
-        while len(side_text_lines) < 2:
-            side_text_lines.append("")
-
-        data = "\n.W{ftext1}\n{ftext2}\n.X{stext1}\n{stext2}\n.Y{ltext}\n\n.C{dlflag}100MMM".format(
-            ftext1=_insert_case_switch_control_chars(front_text_lines[0]),
-            ftext2=_insert_case_switch_control_chars(front_text_lines[1]),
-            stext1=_insert_case_switch_control_chars(side_text_lines[0]),
-            stext2=_insert_case_switch_control_chars(side_text_lines[1]),
-            ltext=_insert_case_switch_control_chars(line_text),
-            dlflag="1" if display_line_text and line_text else "0")
+        
+        def _array_to_byte(array):
+            """
+            Convert a bool array to a byte with the corresponding bits set
+            """
+            byte = 0x00
+            for i, val in enumerate(array):
+                byte |= (int(val) << i)
+            return byte
+        
+        if type(front_text) in (bytes, str):
+            front_text = [front_text]
+        if type(side_text) in (bytes, str):
+            side_text = [side_text]
+        if type(display_line_text_front) is bool:
+            display_line_text_front = [display_line_text_front] * 4
+        if type(display_line_text_side) is bool:
+            display_line_text_side = [display_line_text_side] * 4
+        if type(bold_text_front) is bool:
+            bold_text_front = [bold_text_front] * 8
+        if type(bold_text_side) is bool:
+            bold_text_side = [bold_text_side] * 8
+        
+        display_interval_front = max(1.0, display_interval_front)
+        display_interval_front = min(display_interval_front, 8.5)
+        display_interval_front = round(display_interval_front * 2) - 2 # 0 to 15
+        
+        display_interval_side = max(1.0, display_interval_side)
+        display_interval_side = min(display_interval_side, 8.5)
+        display_interval_side = round(display_interval_side * 2) - 2 # 0 to 15
+        
+        front_text_lines = [a + [""] * (2-len(a)) for a in [_insert_case_switch_control_chars(t).splitlines() for t in front_text]]
+        side_text_lines = [a + [""] * (2-len(a)) for a in [_insert_case_switch_control_chars(t).splitlines() for t in side_text]]
+        line_text = _insert_case_switch_control_chars(line_text)
+        
+        data = ""
+        for lines in front_text_lines:
+            data += "\n.W{}\n{}\n".format(lines[0], lines[1])
+        for lines in side_text_lines:
+            data += "\n.X{}\n{}\n".format(lines[0], lines[1])
+        data += "\n.Y{}\n".format(line_text)
+        data += "\n.C"
+        data += chr(0x30 + _array_to_byte(display_line_text_front))
+        data += chr(0x30 + _array_to_byte(display_line_text_side))
+        data += chr(0x30 + display_interval_front)
+        data += chr(0x30 + display_interval_side)
+        data += text_align_front
+        data += text_align_side
+        data += "M"
+        data += chr(0x20 + _array_to_byte(bold_text_front[0:6]))
+        data += chr(0x20 + _array_to_byte(bold_text_front[6:8] + bold_text_side[0:4]))
+        data += chr(0x20 + _array_to_byte(bold_text_side[4:8]))
+        
         num_blocks = math.ceil(len(data) / 4)
         return self.send_telegram("zA{:>02}{}"
             .format(self.vdv_hex(num_blocks), data.ljust(num_blocks*4)))

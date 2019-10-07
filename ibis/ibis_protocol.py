@@ -14,7 +14,7 @@ class IBISProtocol:
         self.debug = debug
         
         # Simple telegram definitions
-        self.DS001 = self._tg("l{:03d}")        # Line number, 1-4 digits
+        self.DS001 = self._tg("l{:>03}")        # Line number, 1-4 digits
         self.DS001neu = self._tg("q{:0>4}")     # Line number, alphanumeric, 1-4 chars
         self.DS001a = self._tg("qE{:02d}")      # Line number symbol ID, 1-2 digit
         self.DS001b = self._tg("lF{:05d}")      # Radio
@@ -491,7 +491,7 @@ class IBISProtocol:
         Connection information
         """
         
-        data = "\x03{:02d}\x04{}\x05{}".format(
+        data = "\x03{:>02}\x04{}\x05{}".format(
             stop_id, stop_text, change_text)
         num_blocks, remainder = divmod(len(data), 16)
         return self.send_telegram("aL{}{}{}{}"

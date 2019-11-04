@@ -40,3 +40,6 @@ class TCPIBISMaster(IBISProtocol):
         """
         
         return self.socket.recv(length)
+
+    def __del__(self):
+        self.socket.close()

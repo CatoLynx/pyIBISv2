@@ -319,10 +319,10 @@ class MONOProtocol:
         
         if type(image) is str:
             image = Image.open(image)
-        elif type(image) is not Image:
+        elif not isinstance(image, Image.Image):
             raise ValueError("image needs to be either a file path or a PIL Image instance")
         
-        pixels = image.load()
+        pixels = image.convert('L').load()
         width, height = image.size
         max_col_end = math.ceil(height / 4) * 4
         col_addr = col_offset
